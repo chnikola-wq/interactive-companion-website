@@ -1,0 +1,1469 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Osteosynthesis Clinical Companion</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: { extend: {} },
+        }
+    </script>
+    
+    <!-- React & ReactDOM -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    
+    <!-- Babel for in-browser JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- KaTeX for LaTeX -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js" crossorigin="anonymous"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        body { font-family: 'Inter', sans-serif; transition: background-color 0.3s; }
+        
+        .slider-thumb::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            background: #2563eb;
+            cursor: pointer;
+            border-radius: 50%;
+            border: 2px solid white;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+        
+        .dark .slider-thumb::-webkit-slider-thumb {
+            border: 2px solid #1e293b;
+            background: #3b82f6;
+        }
+
+        .dark .katex { color: #f1f5f9 !important; }
+        .bg-slate-800 .katex { color: #dbeafe !important; }
+        
+        .tab-btn {
+            transition: all 0.2s;
+        }
+
+        @keyframes pulse-motion {
+            0%, 100% { transform: translateX(0); }
+            50% { transform: translateX(var(--motion-amount, 10px)); }
+        }
+        
+        .motion-arrow {
+            animation: pulse-motion 1.5s ease-in-out infinite;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 dark:bg-slate-900 transition-colors duration-300">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useMemo, useEffect } = React;
+
+        // LaTeX rendering component
+        const Latex = ({ math, block = false }) => {
+            const html = useMemo(() => {
+                try {
+                    return window.katex ? window.katex.renderToString(math, { displayMode: block, throwOnError: false }) : math;
+                } catch (e) {
+                    return e.message;
+                }
+            }, [math, block]);
+            
+            return (
+                <span 
+                    dangerouslySetInnerHTML={{ __html: html }} 
+                    className={block ? "my-2 flex justify-center overflow-x-auto" : "inline-block"} 
+                />
+            );
+        };
+
+        // Icons
+        const InfoIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="inline mr-1"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>;
+        const ShieldIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="inline mr-1"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>;
+        const SunIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M1 12h2M21 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/></svg>;
+        const MoonIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>;
+        const WarnIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="inline mr-1 text-red-500"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>;
+        const HelpIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="inline"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>;
+        const ActivityIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="inline mr-2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>;
+        const TargetIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="inline mr-2"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg>;
+        const TrendIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="inline mr-2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>;
+        const ScrewIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="inline mr-2"><rect x="10" y="2" width="4" height="20" rx="1"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="16" y2="14"/></svg>;
+        const CallusIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="inline mr-2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"></path><path d="M19 10v3a7 7 0 0 1-14 0v-3"></path></svg>;
+        const FlowchartIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="inline mr-2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>;
+        const BookIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="inline mr-2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>;
+
+        function App() {
+            const [isDarkMode, setIsDarkMode] = useState(true);
+            const [activeTab, setActiveTab] = useState('healing');
+            
+            useEffect(() => {
+                document.documentElement.classList.toggle('dark', isDarkMode);
+            }, [isDarkMode]);
+
+            const tabs = [
+                { id: 'healing', label: 'Healing Philosophy', icon: <ActivityIcon /> },
+                { id: 'paradox', label: 'Working Length', icon: <WarnIcon /> },
+                { id: 'offset', label: 'Bone–Plate Offset', icon: <TargetIcon /> },
+                { id: 'screws', label: 'DCP vs LCP', icon: <ScrewIcon /> },
+                { id: 'material', label: 'Material Selection', icon: <ShieldIcon /> },
+                { id: 'pattern', label: 'Fracture Pattern', icon: <WarnIcon /> },
+                { id: 'callus', label: 'Healing Over Time', icon: <CallusIcon /> },
+                { id: 'chao', label: 'Chao Study', icon: <TrendIcon /> },
+                { id: 'flowchart', label: 'Decision Guide', icon: <FlowchartIcon /> },
+                { id: 'summary', label: 'Summary', icon: <BookIcon /> }
+            ];
+
+            return (
+                <div className="min-h-screen flex flex-col p-4 md:p-8 text-slate-800 dark:text-slate-200 transition-colors duration-300">
+                    <div className="max-w-6xl mx-auto space-y-6 flex-grow w-full">
+                        
+                        {/* Header */}
+                        <header className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+                            <div className="p-6 md:p-8 border-b border-slate-100 dark:border-slate-700 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                                <div>
+                                    <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+                                        Osteosynthesis Clinical Companion
+                                    </h1>
+                                    <p className="text-slate-500 dark:text-slate-400 mt-2 text-sm md:text-base">
+                                        A clinical companion to <a href="Osteosynthesis stiffness v3.8.html" className="text-blue-600 dark:text-blue-400 underline hover:text-blue-700 dark:hover:text-blue-300">Osteosynthesis stiffness v3.8</a>
+                                    </p>
+                                </div>
+                                <button 
+                                    onClick={() => setIsDarkMode(!isDarkMode)} 
+                                    className="p-3 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
+                                    title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+                                >
+                                    {isDarkMode ? <SunIcon /> : <MoonIcon />}
+                                </button>
+                            </div>
+                            
+                            {/* Tab Navigation */}
+                            <div className="p-3 md:p-5 bg-slate-50 dark:bg-slate-800/50">
+                                <div className="flex overflow-x-auto gap-1 md:gap-2 pb-2">
+                                    {tabs.map(tab => (
+                                        <button
+                                            key={tab.id}
+                                            onClick={() => setActiveTab(tab.id)}
+                                            className={`tab-btn px-3 py-2 md:px-4 md:py-3 text-xs md:text-sm font-bold whitespace-nowrap rounded-lg ${
+                                                activeTab === tab.id
+                                                    ? 'bg-blue-600 text-white shadow-lg'
+                                                    : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600'
+                                            }`}
+                                        >
+                                            {tab.icon} {tab.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </header>
+
+                        {/* Content */}
+                        <main>
+                            {activeTab === 'healing' && <HealingPhilosophy />}
+                            {activeTab === 'paradox' && <WorkingLengthParadox />}
+                            {activeTab === 'offset' && <BonePlateOffset />}
+                            {activeTab === 'screws' && <ScrewMechanics />}
+                            {activeTab === 'material' && <MaterialSelection />}
+                            {activeTab === 'pattern' && <FracturePattern />}
+                            {activeTab === 'callus' && <HealingProgression />}
+                            {activeTab === 'chao' && <ChaoCadaveric />}
+                            {activeTab === 'flowchart' && <DecisionFlowchart />}
+                            {activeTab === 'summary' && <SummarySection />}
+                        </main>
+
+                        {/* Footer */}
+                        <footer className="mt-8 text-center text-sm text-slate-500 dark:text-slate-400 border-t border-slate-200 dark:border-slate-700 pt-4">
+                            <ShieldIcon /> Educational companion. For educational purposes only — clinicians must use their own judgement.
+                        </footer>
+                    </div>
+                </div>
+            );
+        }
+
+        // Section 1: Healing Philosophy
+        function HealingPhilosophy() {
+            const [gap, setGap] = useState(2.0);
+            const [ifm, setIfm] = useState(0.3);
+            
+            const strain = useMemo(() => (ifm / gap) * 100, [ifm, gap]);
+            
+            const diagnosis = useMemo(() => {
+                if (strain < 2) return { text: "Primary healing target (absolute stability)", color: "text-green-600 dark:text-green-400" };
+                if (strain < 10) return { text: "Too rigid — risk of delayed healing", color: "text-amber-600 dark:text-amber-400" };
+                if (strain >= 10 && strain <= 40) return { text: "Secondary healing — optimal callus stimulation", color: "text-emerald-600 dark:text-emerald-400" };
+                return { text: "Excessive strain — non-union risk", color: "text-red-600 dark:text-red-400" };
+            }, [strain]);
+
+            return (
+                <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 md:p-8 space-y-6">
+                    <div className="border-l-4 border-blue-500 pl-4">
+                        <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white mb-2">
+                            <ActivityIcon /> Healing Philosophy: Primary vs Secondary
+                        </h2>
+                        <p className="text-slate-600 dark:text-slate-300 text-sm">
+                            Interfragmentary strain governs the healing process. The target strain window depends on the surgical goal.
+                        </p>
+                    </div>
+
+                    <div className="grid md:grid-cols-2 gap-6">
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">
+                                    Fracture gap size: {gap.toFixed(1)} mm
+                                </label>
+                                <input 
+                                    type="range" 
+                                    min="0.1" 
+                                    max="10" 
+                                    step="0.1" 
+                                    value={gap}
+                                    onChange={(e) => setGap(parseFloat(e.target.value))}
+                                    className="slider-thumb w-full"
+                                />
+                            </div>
+                            
+                            <div>
+                                <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">
+                                    Interfragmentary motion (IFM): {ifm.toFixed(2)} mm
+                                </label>
+                                <input 
+                                    type="range" 
+                                    min="0" 
+                                    max="2" 
+                                    step="0.01" 
+                                    value={ifm}
+                                    onChange={(e) => setIfm(parseFloat(e.target.value))}
+                                    className="slider-thumb w-full"
+                                />
+                            </div>
+
+                            <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-lg border border-slate-200 dark:border-slate-700">
+                                <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Interfragmentary Strain</p>
+                                <p className="text-3xl font-extrabold text-blue-600 dark:text-blue-400">
+                                    ε = {strain.toFixed(1)}%
+                                </p>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                                    <Latex math="\varepsilon = \frac{\text{IFM}}{\text{gap}} \times 100" />
+                                </p>
+                            </div>
+
+                            <div className={`p-4 rounded-lg border-2 font-bold text-center ${diagnosis.color}`}>
+                                {diagnosis.text}
+                            </div>
+                        </div>
+
+                        <div className="space-y-4">
+                            {/* Strain band visualization */}
+                            <div className="relative h-40 bg-slate-100 dark:bg-slate-900 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700">
+                                <div className="absolute inset-0 flex">
+                                    <div className="flex-1 bg-green-200 dark:bg-green-900/30 flex items-center justify-center text-xs font-bold text-green-800 dark:text-green-300">
+                                        Primary<br/>&lt;2%
+                                    </div>
+                                    <div className="flex-[4] bg-emerald-200 dark:bg-emerald-900/30 flex items-center justify-center text-xs font-bold text-emerald-800 dark:text-emerald-300">
+                                        Secondary healing zone<br/>10–40%
+                                    </div>
+                                    <div className="flex-1 bg-red-200 dark:bg-red-900/30 flex items-center justify-center text-xs font-bold text-red-800 dark:text-red-300">
+                                        Excessive<br/>&gt;40%
+                                    </div>
+                                </div>
+                                <div 
+                                    className="absolute top-0 bottom-0 w-1 bg-blue-600 shadow-lg"
+                                    style={{ left: `${Math.min(100, (strain / 50) * 100)}%` }}
+                                />
+                            </div>
+
+                            {/* Bone fragment SVG with motion */}
+                            <svg viewBox="0 0 300 150" className="w-full h-auto">
+                                <defs>
+                                    <pattern id="bone-texture" patternUnits="userSpaceOnUse" width="4" height="4">
+                                        <circle cx="2" cy="2" r="0.5" className="fill-slate-300 dark:fill-slate-600"/>
+                                    </pattern>
+                                </defs>
+                                {/* Left fragment */}
+                                <rect x="20" y="40" width="100" height="70" rx="8" className="fill-amber-100 dark:fill-amber-900/30 stroke-amber-700 dark:stroke-amber-400" strokeWidth="3"/>
+                                {/* Right fragment */}
+                                <rect x={180 + ifm * 15} y="40" width="100" height="70" rx="8" className="fill-amber-100 dark:fill-amber-900/30 stroke-amber-700 dark:stroke-amber-400" strokeWidth="3"/>
+                                {/* Gap indicator */}
+                                <line x1="120" y1="75" x2={180 + ifm * 15} y2="75" className="stroke-blue-600 dark:stroke-blue-400 stroke-2" strokeDasharray="4"/>
+                                <text x="150" y="65" className="fill-blue-600 dark:fill-blue-400 text-xs font-bold" textAnchor="middle">
+                                    {gap.toFixed(1)} mm
+                                </text>
+                                {/* Motion arrow */}
+                                <g className="motion-arrow" style={{ '--motion-amount': `${ifm * 8}px` }}>
+                                    <path d="M 200 130 L 220 130 L 215 125 M 220 130 L 215 135" className="stroke-red-600 dark:stroke-red-400 fill-none" strokeWidth="2"/>
+                                    <text x="210" y="145" className="fill-red-600 dark:fill-red-400 text-xs font-bold" textAnchor="middle">IFM</text>
+                                </g>
+                            </svg>
+                        </div>
+                    </div>
+
+                    <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800/50">
+                        <p className="text-sm text-slate-700 dark:text-slate-300">
+                            <InfoIcon /> <strong>Key principle (MacLeod 2018):</strong> Secondary healing requires 10–40% strain to stimulate optimal callus formation. 
+                            Primary healing aims for &lt;2% (absolute stability). Strains above 40% disrupt the healing cascade.
+                        </p>
+                    </div>
+
+                    <p className="text-xs text-slate-500 dark:text-slate-400 italic border-t border-slate-200 dark:border-slate-700 pt-4">
+                        <strong>Source:</strong> MacLeod & Pankaj (2018), Injury 49S1:S12–S18
+                    </p>
+                </div>
+            );
+        }
+
+        // Section 2: Working Length Paradox
+        function WorkingLengthParadox() {
+            const [wl, setWl] = useState(45);
+
+            // Panel A: Small gap / load-sharing (longer WL → lower plate stress)
+            const plateStressA = useMemo(() => 100 / (wl / 20), [wl]);
+            const ifmA = useMemo(() => 20 + (wl - 10) * 0.3, [wl]);
+
+            // Panel B: Large gap / load-bearing (longer WL → higher plate stress)
+            const plateStressB = useMemo(() => 30 + (wl - 10) * 1.2, [wl]);
+            const ifmB = useMemo(() => 40 + (wl - 10) * 0.8, [wl]);
+
+            return (
+                <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 md:p-8 space-y-6">
+                    <div className="border-l-4 border-indigo-500 pl-4">
+                        <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white mb-2">
+                            <WarnIcon /> Working Length Paradox
+                        </h2>
+                        <p className="text-slate-600 dark:text-slate-300 text-sm">
+                            The effect of working length reverses depending on the fracture gap and load-sharing capacity.
+                        </p>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">
+                            Working length: {wl} mm
+                        </label>
+                        <input 
+                            type="range" 
+                            min="10" 
+                            max="80" 
+                            step="1" 
+                            value={wl}
+                            onChange={(e) => setWl(parseInt(e.target.value))}
+                            className="slider-thumb w-full"
+                        />
+                    </div>
+
+                    <div className="grid md:grid-cols-2 gap-6">
+                        {/* Panel A: Load-sharing */}
+                        <div className="border-2 border-emerald-500 rounded-lg p-4 space-y-3">
+                            <h3 className="font-extrabold text-emerald-700 dark:text-emerald-400 text-lg">
+                                (A) Small Gap / Load-Sharing
+                            </h3>
+                            <svg viewBox="0 0 200 180" className="w-full h-auto">
+                                <rect x="70" y="20" width="60" height="140" rx="8" className="fill-amber-100 dark:fill-amber-900/20 stroke-amber-700" strokeWidth="2"/>
+                                <rect x="75" y="10" width="50" height="8" className="fill-slate-400 dark:fill-slate-500"/>
+                                {[30, 50, 70, 90, 110, 130, 150].map(y => (
+                                    <circle key={y} cx="100" cy={y} r="3" className="fill-blue-600"/>
+                                ))}
+                                <line x1="70" y1="90" x2="130" y2="90" className="stroke-red-600 stroke-2" strokeDasharray="4"/>
+                                <text x="140" y="95" className="text-xs fill-red-600 font-bold">Gap ~1mm</text>
+                                <path d="M 100 170 Q 120 175 120 180 Q 120 185 100 190" className="stroke-blue-600 fill-none" strokeWidth="2"/>
+                                <text x="100" y="175" className="text-xs fill-blue-600 font-bold" textAnchor="middle">Bending</text>
+                            </svg>
+                            <div className="space-y-2 text-sm">
+                                <div className="flex justify-between">
+                                    <span className="font-bold">Plate stress:</span>
+                                    <span className="text-emerald-600 dark:text-emerald-400 font-bold">{plateStressA.toFixed(0)} units</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="font-bold">IFM:</span>
+                                    <span className="text-emerald-600 dark:text-emerald-400 font-bold">{ifmA.toFixed(0)} units</span>
+                                </div>
+                            </div>
+                            <p className="text-xs text-slate-600 dark:text-slate-400 italic">
+                                Bone contact allows load-sharing. Longer WL → more flexible → less plate stress.
+                            </p>
+                        </div>
+
+                        {/* Panel B: Load-bearing */}
+                        <div className="border-2 border-red-500 rounded-lg p-4 space-y-3">
+                            <h3 className="font-extrabold text-red-700 dark:text-red-400 text-lg">
+                                (B) Large Gap / Load-Bearing
+                            </h3>
+                            <svg viewBox="0 0 200 180" className="w-full h-auto">
+                                <rect x="70" y="20" width="60" height="50" rx="8" className="fill-amber-100 dark:fill-amber-900/20 stroke-amber-700" strokeWidth="2"/>
+                                <rect x="70" y="110" width="60" height="50" rx="8" className="fill-amber-100 dark:fill-amber-900/20 stroke-amber-700" strokeWidth="2"/>
+                                <rect x="75" y="10" width="50" height="8" className="fill-slate-400 dark:fill-slate-500"/>
+                                {[30, 50].map(y => (
+                                    <circle key={y} cx="100" cy={y} r="3" className="fill-blue-600"/>
+                                ))}
+                                {[120, 140].map(y => (
+                                    <circle key={y} cx="100" cy={y} r="3" className="fill-blue-600"/>
+                                ))}
+                                <rect x="60" y="70" width="80" height="40" className="fill-red-100 dark:fill-red-900/20 stroke-red-600" strokeWidth="2" strokeDasharray="4"/>
+                                <text x="100" y="92" className="text-xs fill-red-600 font-bold" textAnchor="middle">Gap ~6mm</text>
+                                <path d="M 100 160 Q 130 165 140 175" className="stroke-blue-600 fill-none" strokeWidth="2"/>
+                                <text x="100" y="175" className="text-xs fill-blue-600 font-bold" textAnchor="middle">Bending</text>
+                            </svg>
+                            <div className="space-y-2 text-sm">
+                                <div className="flex justify-between">
+                                    <span className="font-bold">Plate stress:</span>
+                                    <span className="text-red-600 dark:text-red-400 font-bold">{plateStressB.toFixed(0)} units</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="font-bold">IFM:</span>
+                                    <span className="text-red-600 dark:text-red-400 font-bold">{ifmB.toFixed(0)} units</span>
+                                </div>
+                            </div>
+                            <p className="text-xs text-slate-600 dark:text-slate-400 italic">
+                                No bone contact. Plate bears full load. Longer WL → more bending → higher plate stress.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="bg-amber-50 dark:bg-amber-900/20 p-4 rounded-lg border border-amber-200 dark:border-amber-800/50">
+                        <p className="text-sm text-slate-700 dark:text-slate-300 mb-3">
+                            <WarnIcon /> <strong>Why Field (1999) and Stoffel (2003) reached opposite conclusions:</strong>
+                        </p>
+                        <ul className="text-sm text-slate-700 dark:text-slate-300 space-y-2 list-disc pl-5">
+                            <li><strong>Field et al.:</strong> Tested DCP constructs in a load-sharing scenario with plate-bone contact. Omitting screws (longer WL) had minimal effect on stiffness because the bone carried most of the load.</li>
+                            <li><strong>Stoffel et al.:</strong> Tested LCP constructs with a fracture gap (load-bearing). Longer WL made constructs more flexible and increased plate strain.</li>
+                            <li><strong>Key insight (MacLeod 2018):</strong> When the plate is in contact with bone, the <em>effective</em> working length is eliminated by load-sharing, making screw placement less critical.</li>
+                        </ul>
+                    </div>
+
+                    <p className="text-xs text-slate-500 dark:text-slate-400 italic border-t border-slate-200 dark:border-slate-700 pt-4">
+                        <strong>Source:</strong> MacLeod & Pankaj (2018), Injury 49S1:S12–S18; Chao et al. (2013), BMC Vet Res 9:125
+                    </p>
+                </div>
+            );
+        }
+
+        // Section 3: Bone-Plate Offset
+        function BonePlateOffset() {
+            const [offset, setOffset] = useState(2);
+            const [screwType, setScrewType] = useState('standard');
+
+            const nearIFM = useMemo(() => 20 + offset * 8, [offset]);
+            const farIFM = useMemo(() => 50 + offset * 2, [offset]);
+            const bendingMoment = useMemo(() => 40 + offset * 15, [offset]);
+
+            const screwInfo = {
+                standard: "Standard locking screws provide angular stability but no additional axial motion.",
+                farcortical: "Far-cortical locking screws intentionally skip the near cortex, increasing axial compliance and IFM by ~50%.",
+                dynamic: "Dynamic locking screws have an internal spring mechanism allowing controlled axial motion (~1 mm).",
+                slot: "Near-cortical slots in the plate allow the screw to slide axially, increasing construct flexibility."
+            };
+
+            const multiplier = screwType === 'standard' ? 1.0 : 1.4;
+
+            return (
+                <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 md:p-8 space-y-6">
+                    <div className="border-l-4 border-amber-500 pl-4">
+                        <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white mb-2">
+                            <TargetIcon /> Bone–Plate Offset & Asymmetric Closure
+                        </h2>
+                        <p className="text-slate-600 dark:text-slate-300 text-sm">
+                            Offset between bone and plate creates asymmetric interfragmentary motion (near cortex closes more than far cortex).
+                        </p>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">
+                            Bone-plate offset: {offset} mm
+                        </label>
+                        <input 
+                            type="range" 
+                            min="0" 
+                            max="6" 
+                            step="0.5" 
+                            value={offset}
+                            onChange={(e) => setOffset(parseFloat(e.target.value))}
+                            className="slider-thumb w-full"
+                        />
+                    </div>
+
+                    <div className="grid md:grid-cols-2 gap-6">
+                        {/* Cross-section SVG */}
+                        <div className="space-y-3">
+                            <svg viewBox="0 0 250 200" className="w-full h-auto bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700">
+                                {/* Bone cross-section */}
+                                <ellipse cx="125" cy="100" rx="60" ry="50" className="fill-amber-100 dark:fill-amber-900/20 stroke-amber-700" strokeWidth="3"/>
+                                <ellipse cx="125" cy="100" rx="30" ry="25" className="fill-slate-100 dark:fill-slate-800 stroke-amber-700" strokeWidth="2"/>
+                                
+                                {/* Plate offset from bone */}
+                                <rect x={60} y={60 - offset * 5} width="130" height="12" rx="2" className="fill-slate-400 dark:fill-slate-500 stroke-slate-600" strokeWidth="2"/>
+                                {[80, 110, 140, 170].map(x => (
+                                    <circle key={x} cx={x} cy={66 - offset * 5} r="3" className="fill-blue-600"/>
+                                ))}
+                                
+                                {/* IFM arrows */}
+                                <g>
+                                    <path d={`M 125 50 L 125 ${70 - offset * 5}`} className="stroke-green-600" strokeWidth="2" markerEnd="url(#arrowGreen)"/>
+                                    <text x="135" y="60" className="text-xs fill-green-600 font-bold">Near: {(nearIFM * multiplier).toFixed(0)}</text>
+                                </g>
+                                <g>
+                                    <path d="M 125 150 L 125 170" className="stroke-red-600" strokeWidth="2" markerEnd="url(#arrowRed)"/>
+                                    <text x="135" y="165" className="text-xs fill-red-600 font-bold">Far: {(farIFM * multiplier).toFixed(0)}</text>
+                                </g>
+                                
+                                <defs>
+                                    <marker id="arrowGreen" markerWidth="10" markerHeight="10" refX="5" refY="5" orient="auto">
+                                        <polygon points="0,0 10,5 0,10" className="fill-green-600"/>
+                                    </marker>
+                                    <marker id="arrowRed" markerWidth="10" markerHeight="10" refX="5" refY="5" orient="auto">
+                                        <polygon points="0,0 10,5 0,10" className="fill-red-600"/>
+                                    </marker>
+                                </defs>
+                            </svg>
+
+                            <div className="space-y-2 text-sm bg-slate-50 dark:bg-slate-900 p-3 rounded-lg">
+                                <div className="flex justify-between">
+                                    <span className="font-bold">Near-cortex IFM:</span>
+                                    <span className="text-green-600 dark:text-green-400 font-bold">{(nearIFM * multiplier).toFixed(0)} units</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="font-bold">Far-cortex IFM:</span>
+                                    <span className="text-red-600 dark:text-red-400 font-bold">{(farIFM * multiplier).toFixed(0)} units</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="font-bold">Plate bending moment:</span>
+                                    <span className="text-blue-600 dark:text-blue-400 font-bold">{bendingMoment.toFixed(0)} units</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Screw options */}
+                        <div className="space-y-3">
+                            <p className="text-sm font-bold text-slate-700 dark:text-slate-300">Advanced screw configurations:</p>
+                            <div className="space-y-2">
+                                {[
+                                    { id: 'standard', label: 'Standard locking screw' },
+                                    { id: 'farcortical', label: 'Far-cortical locking' },
+                                    { id: 'dynamic', label: 'Dynamic locking screw' },
+                                    { id: 'slot', label: 'Near-cortical slot' }
+                                ].map(opt => (
+                                    <button
+                                        key={opt.id}
+                                        onClick={() => setScrewType(opt.id)}
+                                        className={`w-full px-4 py-2 rounded-lg text-left text-sm font-bold transition-all ${
+                                            screwType === opt.id
+                                                ? 'bg-blue-600 text-white shadow-md'
+                                                : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+                                        }`}
+                                    >
+                                        {opt.label}
+                                    </button>
+                                ))}
+                            </div>
+
+                            <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg border border-blue-200 dark:border-blue-800/50 text-sm text-slate-700 dark:text-slate-300">
+                                {screwInfo[screwType]}
+                            </div>
+
+                            <div className="bg-amber-50 dark:bg-amber-900/20 p-3 rounded-lg border border-amber-200 dark:border-amber-800/50 text-xs text-slate-700 dark:text-slate-300">
+                                <WarnIcon /> <strong>Trade-off:</strong> Increasing IFM via these methods also increases screw-bone interface strain due to the lever-arm effect.
+                            </div>
+                        </div>
+                    </div>
+
+                    <p className="text-xs text-slate-500 dark:text-slate-400 italic border-t border-slate-200 dark:border-slate-700 pt-4">
+                        <strong>Source:</strong> MacLeod & Pankaj (2018), Injury 49S1:S12–S18, Fig 2
+                    </p>
+                </div>
+            );
+        }
+
+        // Section 4: Screw Mechanics DCP vs LCP
+        function ScrewMechanics() {
+            const [plateType, setPlateType] = useState('LCP');
+            const [boneQuality, setBoneQuality] = useState('Healthy');
+            const [fractureState, setFractureState] = useState('Reduced');
+
+            const strainData = useMemo(() => {
+                // Relative magnitudes from MacLeod 2015 paper Fig 7
+                const base = {
+                    'DCP-Healthy-Reduced': { maxEV: 100, minEV: 50 },
+                    'LCP-Healthy-Reduced': { maxEV: 95, minEV: 52 },
+                    'DCP-Healthy-Gap': { maxEV: 150, minEV: 80 },
+                    'LCP-Healthy-Gap': { maxEV: 50, minEV: 108 }, // MaxEV -67%, MinEV +35%
+                    'DCP-Osteo-Reduced': { maxEV: 180, minEV: 70 },
+                    'LCP-Osteo-Reduced': { maxEV: 170, minEV: 75 },
+                    'DCP-Osteo-Gap': { maxEV: 260, minEV: 120 },
+                    'LCP-Osteo-Gap': { maxEV: 122, minEV: 125 } // MaxEV -53%, MinEV +4%
+                };
+                return base[`${plateType}-${boneQuality}-${fractureState}`] || { maxEV: 100, minEV: 50 };
+            }, [plateType, boneQuality, fractureState]);
+
+            return (
+                <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 md:p-8 space-y-6">
+                    <div className="border-l-4 border-purple-500 pl-4">
+                        <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white mb-2">
+                            <ScrewIcon /> Screw Mechanics: DCP vs LCP
+                        </h2>
+                        <p className="text-slate-600 dark:text-slate-300 text-sm">
+                            Compression screws (DCP) induce preload strain around the entire screw perimeter. Locking screws (LCP) confine strain to the loaded side.
+                        </p>
+                    </div>
+
+                    <div className="grid md:grid-cols-3 gap-4">
+                        <div>
+                            <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Plate type:</label>
+                            <select 
+                                value={plateType} 
+                                onChange={(e) => setPlateType(e.target.value)}
+                                className="w-full px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-600 font-bold"
+                            >
+                                <option value="DCP">DCP (compression)</option>
+                                <option value="LCP">LCP (locking)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Bone quality:</label>
+                            <select 
+                                value={boneQuality} 
+                                onChange={(e) => setBoneQuality(e.target.value)}
+                                className="w-full px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-600 font-bold"
+                            >
+                                <option value="Healthy">Healthy</option>
+                                <option value="Osteo">Osteoporotic</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Fracture:</label>
+                            <select 
+                                value={fractureState} 
+                                onChange={(e) => setFractureState(e.target.value)}
+                                className="w-full px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-600 font-bold"
+                            >
+                                <option value="Reduced">Reduced</option>
+                                <option value="Gap">Gap</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    {/* Screw hole heat map */}
+                    <div className="grid md:grid-cols-2 gap-6">
+                        <div className="space-y-3">
+                            <p className="text-sm font-bold text-slate-700 dark:text-slate-300">Strain distribution around screw hole:</p>
+                            <svg viewBox="0 0 200 200" className="w-full h-auto bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700">
+                                <circle cx="100" cy="100" r="80" className={plateType === 'DCP' ? 'fill-red-200 dark:fill-red-900/30' : 'fill-slate-100 dark:fill-slate-800'}/>
+                                {plateType === 'DCP' && (
+                                    <>
+                                        <circle cx="100" cy="100" r="65" className="fill-orange-200 dark:fill-orange-900/40"/>
+                                        <circle cx="100" cy="100" r="50" className="fill-yellow-200 dark:fill-yellow-900/40"/>
+                                    </>
+                                )}
+                                {plateType === 'LCP' && (
+                                    <path d="M 100 100 L 180 100 A 80 80 0 0 1 100 180 Z" className="fill-red-200 dark:fill-red-900/30"/>
+                                )}
+                                <circle cx="100" cy="100" r="15" className="fill-slate-400 dark:fill-slate-600 stroke-slate-700" strokeWidth="2"/>
+                                <path d="M 100 20 L 100 0" className="stroke-blue-600" strokeWidth="3" markerEnd="url(#arrowBlue)"/>
+                                <text x="105" y="15" className="text-xs fill-blue-600 font-bold">Load</text>
+                                <defs>
+                                    <marker id="arrowBlue" markerWidth="10" markerHeight="10" refX="5" refY="5" orient="auto">
+                                        <polygon points="0,0 10,5 0,10" className="fill-blue-600"/>
+                                    </marker>
+                                </defs>
+                            </svg>
+                            <p className="text-xs text-slate-600 dark:text-slate-400 italic">
+                                {plateType === 'DCP' 
+                                    ? "DCP: Preload from screw tightening + plate tensioning creates strain all around the perimeter."
+                                    : "LCP: Strain confined primarily to the loaded side (proximal to applied force)."}
+                            </p>
+                        </div>
+
+                        <div className="space-y-3">
+                            <p className="text-sm font-bold text-slate-700 dark:text-slate-300">Bone volume at high strain (≥0.2%):</p>
+                            <div className="space-y-2">
+                                <div>
+                                    <div className="flex justify-between text-xs mb-1">
+                                        <span className="font-bold text-slate-600 dark:text-slate-400">MaxEV (tensile):</span>
+                                        <span className="font-bold text-red-600 dark:text-red-400">{strainData.maxEV} mm³</span>
+                                    </div>
+                                    <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-4">
+                                        <div 
+                                            className="bg-red-500 h-4 rounded-full transition-all duration-300"
+                                            style={{ width: `${(strainData.maxEV / 300) * 100}%` }}
+                                        />
+                                    </div>
+                                </div>
+                                <div>
+                                    <div className="flex justify-between text-xs mb-1">
+                                        <span className="font-bold text-slate-600 dark:text-slate-400">MinEV (compressive):</span>
+                                        <span className="font-bold text-blue-600 dark:text-blue-400">{strainData.minEV} mm³</span>
+                                    </div>
+                                    <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-4">
+                                        <div 
+                                            className="bg-blue-500 h-4 rounded-full transition-all duration-300"
+                                            style={{ width: `${(strainData.minEV / 150) * 100}%` }}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="bg-indigo-50 dark:bg-indigo-900/20 p-3 rounded-lg border border-indigo-200 dark:border-indigo-800/50 text-xs text-slate-700 dark:text-slate-300 space-y-2">
+                                <p><strong>Preload sources (MacLeod 2015, Fig 3):</strong></p>
+                                <ul className="list-disc pl-4 space-y-1">
+                                    <li><strong>Screw-tightening preload:</strong> Torque applied when inserting the screw (DCP only).</li>
+                                    <li><strong>Plate-tensioning preload:</strong> Compressive force across fracture when plate is bent to conform (DCP only).</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg border border-green-200 dark:border-green-800/50">
+                        <p className="text-sm text-slate-700 dark:text-slate-300">
+                            <InfoIcon /> <strong>Key finding (MacLeod 2015):</strong> In osteoporotic bone with a gap, LCP reduces MaxEV (tensile strain) by 53% vs DCP, 
+                            explaining why locking plates have better clinical performance in weak bone.
+                        </p>
+                    </div>
+
+                    <p className="text-xs text-slate-500 dark:text-slate-400 italic border-t border-slate-200 dark:border-slate-700 pt-4">
+                        <strong>Source:</strong> MacLeod, Simpson & Pankaj (2015), Comp Meth Biomech Biomed Eng 18:16, Figs 5–7
+                    </p>
+                </div>
+            );
+        }
+
+        // Section 5: Material Selection
+        function MaterialSelection() {
+            const [modulus, setModulus] = useState(110);
+
+            const plateStiffness = useMemo(() => modulus / 2, [modulus]);
+            const ifm = useMemo(() => 100 - modulus / 4, [modulus]);
+            const interfaceStrain = useMemo(() => 150 - modulus / 2, [modulus]);
+
+            return (
+                <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 md:p-8 space-y-6">
+                    <div className="border-l-4 border-teal-500 pl-4">
+                        <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white mb-2">
+                            <ShieldIcon /> Implant Material Selection: Titanium vs Stainless Steel
+                        </h2>
+                        <p className="text-slate-600 dark:text-slate-300 text-sm">
+                            Lower modulus (Ti) increases IFM but the effect is not proportional due to the plate's eccentric position.
+                        </p>
+                    </div>
+
+                    <div className="space-y-3">
+                        <label className="block text-sm font-bold text-slate-700 dark:text-slate-300">
+                            Plate Young's modulus: {modulus} GPa
+                        </label>
+                        <input 
+                            type="range" 
+                            min="50" 
+                            max="220" 
+                            step="5" 
+                            value={modulus}
+                            onChange={(e) => setModulus(parseInt(e.target.value))}
+                            className="slider-thumb w-full"
+                        />
+                        <div className="flex gap-2">
+                            <button 
+                                onClick={() => setModulus(110)}
+                                className="px-4 py-2 bg-amber-500 text-white rounded-lg font-bold text-sm hover:bg-amber-600 transition-all"
+                            >
+                                Ti-6Al-4V (~110 GPa)
+                            </button>
+                            <button 
+                                onClick={() => setModulus(200)}
+                                className="px-4 py-2 bg-slate-500 text-white rounded-lg font-bold text-sm hover:bg-slate-600 transition-all"
+                            >
+                                SS 316LVM (~200 GPa)
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="grid md:grid-cols-3 gap-4">
+                        <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-lg border border-slate-200 dark:border-slate-700 space-y-2">
+                            <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">Plate Stiffness</p>
+                            <p className="text-2xl font-extrabold text-blue-600 dark:text-blue-400">{plateStiffness.toFixed(0)} units</p>
+                            <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2">
+                                <div className="bg-blue-500 h-2 rounded-full" style={{ width: `${(plateStiffness / 110) * 100}%` }}/>
+                            </div>
+                        </div>
+
+                        <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-lg border border-slate-200 dark:border-slate-700 space-y-2">
+                            <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">IFM (relative)</p>
+                            <p className="text-2xl font-extrabold text-emerald-600 dark:text-emerald-400">{ifm.toFixed(0)} units</p>
+                            <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2">
+                                <div className="bg-emerald-500 h-2 rounded-full" style={{ width: `${(ifm / 100) * 100}%` }}/>
+                            </div>
+                        </div>
+
+                        <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-lg border border-slate-200 dark:border-slate-700 space-y-2">
+                            <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">Screw-Bone Strain</p>
+                            <p className="text-2xl font-extrabold text-red-600 dark:text-red-400">{interfaceStrain.toFixed(0)} units</p>
+                            <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2">
+                                <div className="bg-red-500 h-2 rounded-full" style={{ width: `${(interfaceStrain / 150) * 100}%` }}/>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800/50">
+                        <p className="text-sm text-slate-700 dark:text-slate-300 space-y-2">
+                            <strong className="block"><InfoIcon /> Non-proportional IFM increase:</strong>
+                            <span className="block">
+                                Ti has ~45% lower modulus than SS (110 vs 200 GPa), but IFM increase is <em>not</em> 45%. 
+                                The plate is eccentric to the applied load, so the stiffness reduction translates to a smaller increase in motion (MacLeod 2018).
+                            </span>
+                            <strong className="block mt-3">Trade-off:</strong>
+                            <span className="block">
+                                Higher-stiffness plates (SS) reduce screw-bone interface strain concentrations because the plate bends less under load. 
+                                Lower-stiffness plates (Ti) increase IFM but at the cost of higher interfacial strains.
+                            </span>
+                        </p>
+                    </div>
+
+                    <p className="text-xs text-slate-500 dark:text-slate-400 italic border-t border-slate-200 dark:border-slate-700 pt-4">
+                        <strong>Source:</strong> MacLeod & Pankaj (2018), Injury 49S1:S12–S18; MacLeod et al. (2015)
+                    </p>
+                </div>
+            );
+        }
+
+        // Section 6: Fracture Pattern & Loading
+        function FracturePattern() {
+            const [scenario, setScenario] = useState('tension');
+
+            const scenarios = {
+                tension: {
+                    title: "Tension-Band Load-Sharing",
+                    safety: "green",
+                    description: "Load applied towards the plate compresses the fracture. Bone and plate act as a unified composite beam. This configuration is safe for early weight-bearing.",
+                    svg: <svg viewBox="0 0 200 150" className="w-full h-auto">
+                        <rect x="70" y="30" width="60" height="90" rx="8" className="fill-amber-100 dark:fill-amber-900/20 stroke-amber-700" strokeWidth="2"/>
+                        <rect x="75" y="20" width="50" height="8" className="fill-slate-400 dark:fill-slate-500"/>
+                        <line x1="70" y1="75" x2="130" y2="75" className="stroke-blue-600 stroke-2"/>
+                        <path d="M 100 10 L 100 0" className="stroke-green-600 stroke-3" markerEnd="url(#arrowGreen2)"/>
+                        <text x="105" y="8" className="text-xs fill-green-600 font-bold">Load</text>
+                        <path d="M 65 75 L 50 75 M 135 75 L 150 75" className="stroke-green-600 stroke-2"/>
+                        <text x="100" y="140" className="text-xs fill-slate-600 dark:fill-slate-400 font-bold" textAnchor="middle">Fracture closed</text>
+                        <defs>
+                            <marker id="arrowGreen2" markerWidth="10" markerHeight="10" refX="5" refY="5" orient="auto">
+                                <polygon points="0,0 10,5 0,10" className="fill-green-600"/>
+                            </marker>
+                        </defs>
+                    </svg>
+                },
+                gapopen: {
+                    title: "Gap-Opening Load-Bearing",
+                    safety: "red",
+                    description: "Load applied away from the plate opens the fracture gap. Plate bears the full load with high stress. Risk of plate breakage and fatigue failure. Restrict weight-bearing.",
+                    svg: <svg viewBox="0 0 200 150" className="w-full h-auto">
+                        <rect x="70" y="30" width="60" height="40" rx="8" className="fill-amber-100 dark:fill-amber-900/20 stroke-amber-700" strokeWidth="2"/>
+                        <rect x="70" y="80" width="60" height="40" rx="8" className="fill-amber-100 dark:fill-amber-900/20 stroke-amber-700" strokeWidth="2"/>
+                        <rect x="75" y="20" width="50" height="8" className="fill-slate-400 dark:fill-slate-500"/>
+                        <path d="M 100 10 L 100 0" className="stroke-red-600 stroke-3" markerEnd="url(#arrowRed2)"/>
+                        <text x="105" y="8" className="text-xs fill-red-600 font-bold">Load</text>
+                        <path d="M 135 75 L 150 75" className="stroke-red-600 stroke-2" strokeDasharray="4"/>
+                        <text x="100" y="140" className="text-xs fill-slate-600 dark:fill-slate-400 font-bold" textAnchor="middle">Gap opens</text>
+                        <defs>
+                            <marker id="arrowRed2" markerWidth="10" markerHeight="10" refX="5" refY="5" orient="auto">
+                                <polygon points="0,0 10,5 0,10" className="fill-red-600"/>
+                            </marker>
+                        </defs>
+                    </svg>
+                },
+                wedge: {
+                    title: "Displaced Wedge Fragment",
+                    safety: "red",
+                    description: "A wedge fragment that does not contact opposing cortex creates a load-bearing scenario similar to gap-opening. High plate stress. Consider alternative fixation (e.g., lag screw reduction).",
+                    svg: <svg viewBox="0 0 200 150" className="w-full h-auto">
+                        <rect x="70" y="30" width="60" height="35" rx="8" className="fill-amber-100 dark:fill-amber-900/20 stroke-amber-700" strokeWidth="2"/>
+                        <path d="M 70 65 L 90 90 L 130 85 L 130 65 Z" className="fill-orange-100 dark:fill-orange-900/20 stroke-orange-600" strokeWidth="2"/>
+                        <rect x="70" y="90" width="60" height="30" rx="8" className="fill-amber-100 dark:fill-amber-900/20 stroke-amber-700" strokeWidth="2"/>
+                        <rect x="75" y="20" width="50" height="8" className="fill-slate-400 dark:fill-slate-500"/>
+                        <path d="M 100 10 L 100 0" className="stroke-red-600 stroke-3" markerEnd="url(#arrowRed3)"/>
+                        <text x="100" y="140" className="text-xs fill-slate-600 dark:fill-slate-400 font-bold" textAnchor="middle">Wedge displaced</text>
+                        <defs>
+                            <marker id="arrowRed3" markerWidth="10" markerHeight="10" refX="5" refY="5" orient="auto">
+                                <polygon points="0,0 10,5 0,10" className="fill-red-600"/>
+                            </marker>
+                        </defs>
+                    </svg>
+                }
+            };
+
+            const current = scenarios[scenario];
+
+            return (
+                <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 md:p-8 space-y-6">
+                    <div className="border-l-4 border-rose-500 pl-4">
+                        <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white mb-2">
+                            <WarnIcon /> Fracture Pattern & Loading Direction
+                        </h2>
+                        <p className="text-slate-600 dark:text-slate-300 text-sm">
+                            The relationship between load direction and plate position determines whether the construct is load-sharing or load-bearing.
+                        </p>
+                    </div>
+
+                    <div className="flex gap-2 flex-wrap">
+                        {Object.entries(scenarios).map(([key, val]) => (
+                            <button
+                                key={key}
+                                onClick={() => setScenario(key)}
+                                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+                                    scenario === key
+                                        ? 'bg-blue-600 text-white shadow-md'
+                                        : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+                                }`}
+                            >
+                                {val.title}
+                            </button>
+                        ))}
+                    </div>
+
+                    <div className="grid md:grid-cols-2 gap-6">
+                        <div>
+                            {current.svg}
+                        </div>
+
+                        <div className="space-y-4">
+                            <div className={`p-6 rounded-lg border-4 ${
+                                current.safety === 'green' 
+                                    ? 'border-green-500 bg-green-50 dark:bg-green-900/20' 
+                                    : 'border-red-500 bg-red-50 dark:bg-red-900/20'
+                            }`}>
+                                <div className="text-center mb-3">
+                                    <div className={`inline-block w-16 h-16 rounded-full ${
+                                        current.safety === 'green' ? 'bg-green-500' : 'bg-red-500'
+                                    } flex items-center justify-center text-white text-3xl font-bold`}>
+                                        {current.safety === 'green' ? '✓' : '!'}
+                                    </div>
+                                </div>
+                                <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
+                                    {current.description}
+                                </p>
+                            </div>
+
+                            <div className="bg-amber-50 dark:bg-amber-900/20 p-4 rounded-lg border border-amber-200 dark:border-amber-800/50 text-sm text-slate-700 dark:text-slate-300">
+                                <p className="font-bold mb-2">Chao 2013, Fig 5: Plate Lift-Off Under Offset Axial Load</p>
+                                <p>
+                                    When the femur is loaded axially with one end constrained, the proximal segment rotates. 
+                                    In long working-length constructs, this rotation causes the plate to lift off the lateral cortex, 
+                                    converting a load-sharing situation into load-bearing.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p className="text-xs text-slate-500 dark:text-slate-400 italic border-t border-slate-200 dark:border-slate-700 pt-4">
+                        <strong>Source:</strong> MacLeod & Pankaj (2018), Injury 49S1:S12–S18, Fig 4; Chao et al. (2013), Fig 5
+                    </p>
+                </div>
+            );
+        }
+
+        // Section 7: Healing Progression (Callus over time)
+        function HealingProgression() {
+            const [time, setTime] = useState(12);
+
+            const callusStiffness = useMemo(() => {
+                // Exponential stiffening: starts at ~5% of bone stiffness, reaches ~80% by 24 weeks
+                return 5 * Math.exp(time / 8);
+            }, [time]);
+
+            // Rigid plate (short WL): IFM drops quickly, plate stress stays higher longer
+            const ifmRigid = useMemo(() => 80 * Math.exp(-time / 6), [time]);
+            const stressRigid = useMemo(() => 90 - time * 2, [time]);
+
+            // Flexible plate (long WL): starts higher but drops faster due to load-sharing transition
+            const ifmFlexible = useMemo(() => 120 * Math.exp(-time / 5), [time]);
+            const stressFlexible = useMemo(() => 130 - time * 4, [time]);
+
+            return (
+                <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 md:p-8 space-y-6">
+                    <div className="border-l-4 border-green-500 pl-4">
+                        <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white mb-2">
+                            <CallusIcon /> Healing Progression: Callus Stiffening Over Time
+                        </h2>
+                        <p className="text-slate-600 dark:text-slate-300 text-sm">
+                            As callus forms and stiffens, IFM decreases and load is progressively transferred from the plate to the healing bone.
+                        </p>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">
+                            Time post-op: {time} weeks
+                        </label>
+                        <input 
+                            type="range" 
+                            min="0" 
+                            max="24" 
+                            step="1" 
+                            value={time}
+                            onChange={(e) => setTime(parseInt(e.target.value))}
+                            className="slider-thumb w-full"
+                        />
+                    </div>
+
+                    <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-lg border border-slate-200 dark:border-slate-700">
+                        <p className="text-sm font-bold text-slate-600 dark:text-slate-400 mb-2">Callus stiffness (relative to intact bone):</p>
+                        <p className="text-3xl font-extrabold text-green-600 dark:text-green-400">{Math.min(100, callusStiffness).toFixed(0)}%</p>
+                        <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-3 mt-2">
+                            <div className="bg-green-500 h-3 rounded-full transition-all" style={{ width: `${Math.min(100, callusStiffness)}%` }}/>
+                        </div>
+                    </div>
+
+                    <div className="grid md:grid-cols-2 gap-6">
+                        {/* IFM over time */}
+                        <div className="space-y-3">
+                            <p className="text-sm font-bold text-slate-700 dark:text-slate-300">Interfragmentary Motion (IFM) vs Time</p>
+                            <svg viewBox="0 0 300 200" className="w-full h-auto bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700">
+                                <line x1="40" y1="20" x2="40" y2="160" className="stroke-slate-400" strokeWidth="2"/>
+                                <line x1="40" y1="160" x2="280" y2="160" className="stroke-slate-400" strokeWidth="2"/>
+                                <text x="160" y="190" className="text-xs fill-slate-500 dark:fill-slate-400 font-bold" textAnchor="middle">Time (weeks)</text>
+                                <text x="20" y="90" className="text-xs fill-slate-500 dark:fill-slate-400 font-bold" textAnchor="middle" transform="rotate(-90 20 90)">IFM</text>
+                                
+                                {/* Flexible plate curve */}
+                                <path d={`M 40 40 Q 160 30 280 150`} className="stroke-blue-600 stroke-3 fill-none"/>
+                                <circle cx={40 + time * 10} cy={40 + (160 - 40) * (1 - ifmFlexible / 120)} r="5" className="fill-blue-600"/>
+                                
+                                {/* Rigid plate curve */}
+                                <path d={`M 40 70 Q 160 60 280 150`} className="stroke-purple-600 stroke-3 fill-none"/>
+                                <circle cx={40 + time * 10} cy={70 + (160 - 70) * (1 - ifmRigid / 80)} r="5" className="fill-purple-600"/>
+                                
+                                <text x="200" y="35" className="text-xs fill-blue-600 font-bold">Flexible (long WL)</text>
+                                <text x="200" y="65" className="text-xs fill-purple-600 font-bold">Rigid (short WL)</text>
+                            </svg>
+                        </div>
+
+                        {/* Plate stress over time */}
+                        <div className="space-y-3">
+                            <p className="text-sm font-bold text-slate-700 dark:text-slate-300">Plate Stress vs Time</p>
+                            <svg viewBox="0 0 300 200" className="w-full h-auto bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700">
+                                <line x1="40" y1="20" x2="40" y2="160" className="stroke-slate-400" strokeWidth="2"/>
+                                <line x1="40" y1="160" x2="280" y2="160" className="stroke-slate-400" strokeWidth="2"/>
+                                <text x="160" y="190" className="text-xs fill-slate-500 dark:fill-slate-400 font-bold" textAnchor="middle">Time (weeks)</text>
+                                <text x="20" y="90" className="text-xs fill-slate-500 dark:fill-slate-400 font-bold" textAnchor="middle" transform="rotate(-90 20 90)">Plate Stress</text>
+                                
+                                {/* Flexible plate curve (drops faster) */}
+                                <path d={`M 40 30 L 280 150`} className="stroke-blue-600 stroke-3 fill-none"/>
+                                <circle cx={40 + time * 10} cy={30 + Math.max(0, 130 - stressFlexible)} r="5" className="fill-blue-600"/>
+                                
+                                {/* Rigid plate curve (drops slower) */}
+                                <path d={`M 40 50 L 280 140`} className="stroke-purple-600 stroke-3 fill-none"/>
+                                <circle cx={40 + time * 10} cy={50 + Math.max(0, 90 - stressRigid)} r="5" className="fill-purple-600"/>
+                                
+                                <text x="200" y="25" className="text-xs fill-blue-600 font-bold">Flexible (long WL)</text>
+                                <text x="200" y="45" className="text-xs fill-purple-600 font-bold">Rigid (short WL)</text>
+                            </svg>
+                        </div>
+                    </div>
+
+                    <div className="bg-emerald-50 dark:bg-emerald-900/20 p-4 rounded-lg border border-emerald-200 dark:border-emerald-800/50">
+                        <p className="text-sm text-slate-700 dark:text-slate-300">
+                            <InfoIcon /> <strong>Load-sharing transition advantage (MacLeod 2018, Figs 6 & 7):</strong> The flexible plate initially experiences higher stress, 
+                            but as callus stiffens, it transitions to load-sharing more effectively, dropping plate stress faster than the rigid construct.
+                        </p>
+                    </div>
+
+                    <p className="text-xs text-slate-500 dark:text-slate-400 italic border-t border-slate-200 dark:border-slate-700 pt-4">
+                        <strong>Source:</strong> MacLeod & Pankaj (2018), Injury 49S1:S12–S18, Figs 6 & 7
+                    </p>
+                </div>
+            );
+        }
+
+        // Section 8: Chao Cadaveric Replication
+        function ChaoCadaveric() {
+            const [config, setConfig] = useState('short');
+            const [load, setLoad] = useState(350);
+
+            const yieldLoads = { short: 654.5, long: 452.9 };
+            const stdev = { short: 149.0, long: 63.4 };
+
+            const bendingMoment = useMemo(() => {
+                const d = 12; // perpendicular distance (mm) — simplified
+                return (load * d) / 1000; // Nm
+            }, [load]);
+
+            const liftOff = useMemo(() => config === 'long' && load > 400, [config, load]);
+
+            return (
+                <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 md:p-8 space-y-6">
+                    <div className="border-l-4 border-cyan-500 pl-4">
+                        <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white mb-2">
+                            <TrendIcon /> Chao et al. 2013: Cadaveric Femoral Study
+                        </h2>
+                        <p className="text-slate-600 dark:text-slate-300 text-sm">
+                            12-hole 2.4 mm LCP in dog femora with simulated fracture gap. Short WL (5 screws/segment) vs Long WL (2 screws/segment).
+                        </p>
+                    </div>
+
+                    <div className="flex gap-2">
+                        <button 
+                            onClick={() => setConfig('short')}
+                            className={`px-4 py-2 rounded-lg font-bold text-sm ${config === 'short' ? 'bg-purple-600 text-white shadow-md' : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300'}`}
+                        >
+                            Short WL (5 screws/segment)
+                        </button>
+                        <button 
+                            onClick={() => setConfig('long')}
+                            className={`px-4 py-2 rounded-lg font-bold text-sm ${config === 'long' ? 'bg-blue-600 text-white shadow-md' : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300'}`}
+                        >
+                            Long WL (2 screws/segment)
+                        </button>
+                    </div>
+
+                    <div className="grid md:grid-cols-2 gap-6">
+                        {/* Femur diagram */}
+                        <div className="space-y-3">
+                            <p className="text-sm font-bold text-slate-700 dark:text-slate-300">Dog femur with 2.4 mm LCP (Fig 1):</p>
+                            <svg viewBox="0 0 200 300" className="w-full h-auto bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700">
+                                {/* Femur */}
+                                <rect x="70" y="40" width="60" height="220" rx="10" className="fill-amber-100 dark:fill-amber-900/20 stroke-amber-700" strokeWidth="3"/>
+                                {/* Plate */}
+                                <rect x="65" y="30" width="70" height="10" rx="2" className={`fill-slate-400 dark:fill-slate-500 ${liftOff ? 'opacity-50' : ''}`}/>
+                                {liftOff && (
+                                    <rect x="65" y="200" width="70" height="10" rx="2" className="fill-slate-400 dark:fill-slate-500 opacity-30"/>
+                                )}
+                                
+                                {/* Screws */}
+                                {config === 'short' && [60, 90, 120, 150, 180, 70, 100, 130, 160, 190].map((y, i) => (
+                                    <circle key={i} cx="100" cy={y} r="4" className={i % 2 === 0 ? 'fill-blue-600' : 'fill-slate-500'} stroke="white" strokeWidth="1"/>
+                                ))}
+                                {config === 'long' && [60, 180, 70, 190].map((y, i) => (
+                                    <circle key={i} cx="100" cy={y} r="4" className={i < 2 ? 'fill-slate-500' : 'fill-blue-600'} stroke="white" strokeWidth="1"/>
+                                ))}
+                                
+                                {/* Gap */}
+                                <line x1="70" y1="150" x2="130" y2="150" className="stroke-red-600 stroke-3" strokeDasharray="5"/>
+                                
+                                {/* Load arrow */}
+                                <path d="M 100 20 L 100 5" className="stroke-green-600 stroke-3" markerEnd="url(#arrowGreen3)"/>
+                                <text x="105" y="15" className="text-xs fill-green-600 font-bold">{load} N</text>
+                                
+                                {liftOff && (
+                                    <text x="140" y="210" className="text-xs fill-red-600 font-bold">Lift-off!</text>
+                                )}
+                                
+                                <defs>
+                                    <marker id="arrowGreen3" markerWidth="10" markerHeight="10" refX="5" refY="5" orient="auto">
+                                        <polygon points="0,0 10,5 0,10" className="fill-green-600"/>
+                                    </marker>
+                                </defs>
+                                
+                                <text x="30" y="65" className="text-xs fill-blue-600 font-bold">Locking</text>
+                                <text x="30" y="75" className="text-xs fill-slate-500 font-bold">Cortical</text>
+                            </svg>
+                        </div>
+
+                        {/* Load control and data */}
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">
+                                    Applied axial load: {load} N
+                                </label>
+                                <input 
+                                    type="range" 
+                                    min="0" 
+                                    max="700" 
+                                    step="10" 
+                                    value={load}
+                                    onChange={(e) => setLoad(parseInt(e.target.value))}
+                                    className="slider-thumb w-full"
+                                />
+                            </div>
+
+                            <div className="bg-slate-50 dark:bg-slate-900 p-3 rounded-lg border border-slate-200 dark:border-slate-700 space-y-2 text-sm">
+                                <div className="flex justify-between">
+                                    <span className="font-bold">Bending moment:</span>
+                                    <span className="text-blue-600 dark:text-blue-400 font-bold">{bendingMoment.toFixed(2)} Nm</span>
+                                </div>
+                                <p className="text-xs text-slate-600 dark:text-slate-400 italic">
+                                    M = F × d, where d is perpendicular distance to rotation axis
+                                </p>
+                            </div>
+
+                            <div className="bg-amber-50 dark:bg-amber-900/20 p-4 rounded-lg border border-amber-200 dark:border-amber-800/50">
+                                <p className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Measured yield loads:</p>
+                                <div className="space-y-3">
+                                    <div>
+                                        <div className="flex justify-between mb-1">
+                                            <span className="text-xs font-bold">Short WL:</span>
+                                            <span className="text-xs font-bold text-purple-600">654.5 ± 149.0 N</span>
+                                        </div>
+                                        <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-3">
+                                            <div className="bg-purple-500 h-3 rounded-full" style={{ width: '100%' }}/>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div className="flex justify-between mb-1">
+                                            <span className="text-xs font-bold">Long WL:</span>
+                                            <span className="text-xs font-bold text-blue-600">452.9 ± 63.4 N</span>
+                                        </div>
+                                        <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-3">
+                                            <div className="bg-blue-500 h-3 rounded-full" style={{ width: '69%' }}/>
+                                        </div>
+                                    </div>
+                                </div>
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mt-3 italic">P = 0.016 (significant difference)</p>
+                            </div>
+
+                            <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg border border-green-200 dark:border-green-800/50 text-xs text-slate-700 dark:text-slate-300">
+                                <p><strong>Fatigue test result:</strong> All 20 specimens (both groups) completed 180,000 cycles at full body-weight load without failure.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800/50">
+                        <p className="text-sm text-slate-700 dark:text-slate-300">
+                            <InfoIcon /> <strong>Key finding:</strong> In a <em>plate-on-bone</em> configuration with offset axial loading, 
+                            the Long WL group experienced rotation of the proximal segment and plate lift-off from the distal cortex (Fig 5), 
+                            converting the construct from load-sharing to load-bearing and resulting in lower yield strength.
+                        </p>
+                    </div>
+
+                    <p className="text-xs text-slate-500 dark:text-slate-400 italic border-t border-slate-200 dark:border-slate-700 pt-4">
+                        <strong>Source:</strong> Chao et al. (2013), BMC Veterinary Research 9:125
+                    </p>
+                </div>
+            );
+        }
+
+        // Section 9: Decision Flowchart
+        function DecisionFlowchart() {
+            const [offset, setOffset] = useState('');
+            const [gap, setGap] = useState('');
+            const [goal, setGoal] = useState('');
+
+            const recommendation = useMemo(() => {
+                if (!offset || !gap || !goal) return null;
+                
+                if (offset === 'no' && goal === 'primary') {
+                    return "Plate in contact + primary healing goal → Screw placement has minimal influence. Prioritise anatomic reduction and absolute stability.";
+                }
+                if (offset === 'no' && gap === 'small' && goal === 'secondary') {
+                    return "Small gap + plate contact → Load-sharing expected. Longer working length reduces plate stress. Aim for 10–40% interfragmentary strain.";
+                }
+                if (offset === 'yes' || gap === 'large') {
+                    return "Large gap or bone-plate offset → Load-bearing construct. Shorter working length reduces plate stress and fatigue risk. Consider far-cortical locking to increase IFM if needed.";
+                }
+                return "Configuration acceptable. Monitor healing progress.";
+            }, [offset, gap, goal]);
+
+            return (
+                <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 md:p-8 space-y-6">
+                    <div className="border-l-4 border-violet-500 pl-4">
+                        <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white mb-2">
+                            <FlowchartIcon /> Interactive Decision Flowchart
+                        </h2>
+                        <p className="text-slate-600 dark:text-slate-300 text-sm">
+                            Based on MacLeod 2018, Fig 8. Answer three questions to receive a configuration recommendation.
+                        </p>
+                    </div>
+
+                    <div className="grid md:grid-cols-3 gap-4">
+                        <div>
+                            <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">
+                                1. Bone–plate offset present?
+                            </label>
+                            <select 
+                                value={offset} 
+                                onChange={(e) => setOffset(e.target.value)}
+                                className="w-full px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-600 font-bold"
+                            >
+                                <option value="">-- Select --</option>
+                                <option value="yes">Yes</option>
+                                <option value="no">No</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">
+                                2. Fracture gap size:
+                            </label>
+                            <select 
+                                value={gap} 
+                                onChange={(e) => setGap(e.target.value)}
+                                className="w-full px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-600 font-bold"
+                            >
+                                <option value="">-- Select --</option>
+                                <option value="small">&lt; 1 mm (small)</option>
+                                <option value="large">&gt; 1 mm (large)</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">
+                                3. Healing goal:
+                            </label>
+                            <select 
+                                value={goal} 
+                                onChange={(e) => setGoal(e.target.value)}
+                                className="w-full px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-600 font-bold"
+                            >
+                                <option value="">-- Select --</option>
+                                <option value="primary">Primary (absolute stability)</option>
+                                <option value="secondary">Secondary (callus formation)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    {recommendation && (
+                        <div className="bg-emerald-50 dark:bg-emerald-900/20 p-6 rounded-lg border-2 border-emerald-500 shadow-lg">
+                            <p className="text-lg font-bold text-emerald-700 dark:text-emerald-300 mb-2">Recommendation:</p>
+                            <p className="text-slate-700 dark:text-slate-300">{recommendation}</p>
+                        </div>
+                    )}
+
+                    {/* Flowchart SVG (simplified) */}
+                    <div className="mt-6">
+                        <p className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3">Full decision tree (MacLeod 2018, Fig 8):</p>
+                        <svg viewBox="0 0 600 400" className="w-full h-auto bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700">
+                            {/* Start */}
+                            <rect x="250" y="10" width="100" height="40" rx="5" className={`fill-blue-500 text-white`}/>
+                            <text x="300" y="35" className="fill-white text-sm font-bold" textAnchor="middle">Start</text>
+                            
+                            {/* Offset? */}
+                            <line x1="300" y1="50" x2="300" y2="80" className={`stroke-slate-400 ${offset ? 'stroke-blue-600' : ''}`} strokeWidth="2"/>
+                            <rect x="225" y="80" width="150" height="50" rx="5" className={`fill-slate-200 dark:fill-slate-700 ${offset ? 'stroke-blue-600 stroke-4' : 'stroke-slate-400 stroke-2'}`}/>
+                            <text x="300" y="100" className="fill-slate-700 dark:fill-slate-300 text-xs font-bold" textAnchor="middle">Bone-plate</text>
+                            <text x="300" y="115" className="fill-slate-700 dark:fill-slate-300 text-xs font-bold" textAnchor="middle">offset?</text>
+                            
+                            {/* Branches */}
+                            <line x1="225" y1="130" x2="100" y2="180" className={`stroke-slate-400 ${offset === 'no' ? 'stroke-blue-600 stroke-3' : ''}`} strokeWidth="2"/>
+                            <text x="150" y="155" className="fill-slate-600 dark:fill-slate-400 text-xs font-bold">No</text>
+                            
+                            <line x1="375" y1="130" x2="500" y2="180" className={`stroke-slate-400 ${offset === 'yes' ? 'stroke-blue-600 stroke-3' : ''}`} strokeWidth="2"/>
+                            <text x="450" y="155" className="fill-slate-600 dark:fill-slate-400 text-xs font-bold">Yes</text>
+                            
+                            {/* Gap? */}
+                            <rect x="25" y="180" width="150" height="50" rx="5" className={`fill-slate-200 dark:fill-slate-700 ${offset === 'no' && gap ? 'stroke-blue-600 stroke-4' : 'stroke-slate-400 stroke-2'}`}/>
+                            <text x="100" y="200" className="fill-slate-700 dark:fill-slate-300 text-xs font-bold" textAnchor="middle">Gap &gt; 1mm?</text>
+                            
+                            {/* Outcomes */}
+                            <rect x="25" y="270" width="70" height="60" rx="5" className={`fill-green-100 dark:fill-green-900/30 ${offset === 'no' && gap === 'small' ? 'stroke-green-600 stroke-4' : 'stroke-green-400 stroke-2'}`}/>
+                            <text x="60" y="295" className="fill-green-700 dark:fill-green-400 text-xs font-bold" textAnchor="middle">Load-</text>
+                            <text x="60" y="310" className="fill-green-700 dark:fill-green-400 text-xs font-bold" textAnchor="middle">sharing</text>
+                            
+                            <rect x="105" y="270" width="70" height="60" rx="5" className={`fill-red-100 dark:fill-red-900/30 ${offset === 'no' && gap === 'large' ? 'stroke-red-600 stroke-4' : 'stroke-red-400 stroke-2'}`}/>
+                            <text x="140" y="295" className="fill-red-700 dark:fill-red-400 text-xs font-bold" textAnchor="middle">Load-</text>
+                            <text x="140" y="310" className="fill-red-700 dark:fill-red-400 text-xs font-bold" textAnchor="middle">bearing</text>
+                            
+                            <rect x="425" y="270" width="150" height="60" rx="5" className={`fill-red-100 dark:fill-red-900/30 ${offset === 'yes' ? 'stroke-red-600 stroke-4' : 'stroke-red-400 stroke-2'}`}/>
+                            <text x="500" y="295" className="fill-red-700 dark:fill-red-400 text-xs font-bold" textAnchor="middle">Load-bearing</text>
+                            <text x="500" y="310" className="fill-red-700 dark:fill-red-400 text-xs font-bold" textAnchor="middle">(use shorter WL)</text>
+                        </svg>
+                    </div>
+
+                    <p className="text-xs text-slate-500 dark:text-slate-400 italic border-t border-slate-200 dark:border-slate-700 pt-4">
+                        <strong>Source:</strong> MacLeod & Pankaj (2018), Injury 49S1:S12–S18, Fig 8
+                    </p>
+                </div>
+            );
+        }
+
+        // Section 10: Summary & Cross-Links
+        function SummarySection() {
+            return (
+                <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 md:p-8 space-y-6">
+                    <div className="border-l-4 border-slate-500 pl-4">
+                        <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white mb-2">
+                            <BookIcon /> Summary & Clinical Take-Homes
+                        </h2>
+                        <p className="text-slate-600 dark:text-slate-300 text-sm">
+                            Key insights synthesised from Chao 2013, MacLeod 2018, and MacLeod 2015.
+                        </p>
+                    </div>
+
+                    <div className="space-y-4">
+                        <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800/50">
+                            <h3 className="font-bold text-blue-800 dark:text-blue-400 mb-2">1. The Working Length Paradox is Real</h3>
+                            <p className="text-sm text-slate-700 dark:text-slate-300">
+                                Longer working length reduces plate stress in <strong>load-sharing</strong> scenarios (small gaps, plate-bone contact) but 
+                                <em>increases</em> plate stress in <strong>load-bearing</strong> scenarios (large gaps, comminution). The same screw configuration performs 
+                                differently depending on the fracture pattern.
+                            </p>
+                        </div>
+
+                        <div className="bg-emerald-50 dark:bg-emerald-900/20 p-4 rounded-lg border border-emerald-200 dark:border-emerald-800/50">
+                            <h3 className="font-bold text-emerald-800 dark:text-emerald-400 mb-2">2. Interfragmentary Strain is the Master Variable</h3>
+                            <p className="text-sm text-slate-700 dark:text-slate-300">
+                                Secondary healing requires 10–40% interfragmentary strain. Too little (&lt;2%) promotes primary healing (slow, requires absolute stability). 
+                                Too much (&gt;40%) disrupts callus formation and leads to non-union. The construct stiffness must be tuned to the fracture gap.
+                            </p>
+                        </div>
+
+                        <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg border border-purple-200 dark:border-purple-800/50">
+                            <h3 className="font-bold text-purple-800 dark:text-purple-400 mb-2">3. Locking Plates Excel in Osteoporotic Bone</h3>
+                            <p className="text-sm text-slate-700 dark:text-slate-300">
+                                DCP screws induce preload strain all around the screw hole (from tightening and plate tensioning), creating large tensile strains 
+                                that weaken osteoporotic bone. LCP screws confine strain to the loaded side, reducing tensile strain volume by up to 53% in gap scenarios.
+                            </p>
+                        </div>
+
+                        <div className="bg-amber-50 dark:bg-amber-900/20 p-4 rounded-lg border border-amber-200 dark:border-amber-800/50">
+                            <h3 className="font-bold text-amber-800 dark:text-amber-500 mb-2">4. Bone-Plate Offset Introduces Asymmetric Closure</h3>
+                            <p className="text-sm text-slate-700 dark:text-slate-300">
+                                When the plate is offset from the bone, the near cortex closes more than the far cortex, creating uneven IFM distribution. 
+                                Techniques like far-cortical locking increase IFM but also increase screw-bone interface strain via the lever-arm effect.
+                            </p>
+                        </div>
+
+                        <div className="bg-teal-50 dark:bg-teal-900/20 p-4 rounded-lg border border-teal-200 dark:border-teal-800/50">
+                            <h3 className="font-bold text-teal-800 dark:text-teal-400 mb-2">5. Material Choice: Ti vs SS is a Trade-Off</h3>
+                            <p className="text-sm text-slate-700 dark:text-slate-300">
+                                Titanium (E ≈ 110 GPa) increases IFM compared to stainless steel (E ≈ 200 GPa), but the increase is <em>not</em> proportional 
+                                to the modulus ratio because the plate is eccentric to the load. Higher-stiffness plates reduce screw-bone interface strain concentrations.
+                            </p>
+                        </div>
+
+                        <div className="bg-rose-50 dark:bg-rose-900/20 p-4 rounded-lg border border-rose-200 dark:border-rose-800/50">
+                            <h3 className="font-bold text-rose-800 dark:text-rose-400 mb-2">6. Load Direction Dictates Construct Behavior</h3>
+                            <p className="text-sm text-slate-700 dark:text-slate-300">
+                                Tension-band loading (toward the plate) allows load-sharing and is safe for early weight-bearing. Gap-opening loading (away from the plate) 
+                                forces the plate to bear the full load, risking fatigue failure. Chao 2013 demonstrated that offset axial loads can cause plate lift-off in long WL constructs.
+                            </p>
+                        </div>
+
+                        <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg border border-green-200 dark:border-green-800/50">
+                            <h3 className="font-bold text-green-800 dark:text-green-400 mb-2">7. Callus Stiffening Shifts the Load Progressively</h3>
+                            <p className="text-sm text-slate-700 dark:text-slate-300">
+                                As callus forms over 12–24 weeks, its stiffness increases exponentially. Flexible plates (longer WL) initially see higher stress 
+                                but transition to load-sharing more effectively as healing progresses, ultimately reducing plate stress faster than rigid constructs.
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Link back to v3.8 */}
+                    <div className="bg-gradient-to-r from-blue-500 to-indigo-600 p-6 rounded-xl shadow-lg text-white mt-8">
+                        <h3 className="text-xl font-extrabold mb-3">Ready for Quantitative Analysis?</h3>
+                        <p className="text-sm mb-4 opacity-90">
+                            This companion has introduced you to the <em>concepts</em>. Now move to the full calculator to model specific implant geometries, 
+                            calculate stiffness, evaluate yield strength, and estimate fatigue life for your patient's case.
+                        </p>
+                        <a 
+                            href="Osteosynthesis stiffness v3.8.html"
+                            className="inline-block px-6 py-3 bg-white text-blue-600 font-bold rounded-lg shadow-md hover:bg-blue-50 transition-all"
+                        >
+                            Open the v3.8 Stiffness & Strength Calculator →
+                        </a>
+                    </div>
+
+                    <div className="border-t-2 border-slate-200 dark:border-slate-700 pt-6 space-y-3 text-sm text-slate-600 dark:text-slate-400">
+                        <p className="font-bold text-slate-800 dark:text-slate-200">References:</p>
+                        <ul className="list-disc pl-5 space-y-1">
+                            <li>Chao P, Conrad BP, Lewis DD, Horodyski MB, Pozzi A. (2013). Effect of plate working length on plate stiffness and cyclic fatigue life in a cadaveric femoral fracture gap model stabilized with a 12-hole 2.4 mm locking compression plate. <em>BMC Vet Res</em> 9:125.</li>
+                            <li>MacLeod AR, Pankaj P. (2018). Pre-operative planning for fracture fixation using locking plates: device configuration and other considerations. <em>Injury</em> 49(S1):S12–S18.</li>
+                            <li>MacLeod AR, Simpson AHRW, Pankaj P. (2015). Reasons why dynamic compression plates are inferior to locking plates in osteoporotic bone: a finite element explanation. <em>Comput Methods Biomech Biomed Eng</em> 18:16, 1818–1825.</li>
+                        </ul>
+                    </div>
+                </div>
+            );
+        }
+
+        // Render
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
